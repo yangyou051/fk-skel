@@ -1,0 +1,195 @@
+
+BeiJing.png
+size: 1974,1417
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+baikuai
+  rotate: false
+  xy: 1587, 32
+  size: 97, 97
+  orig: 97, 97
+  offset: 0, 0
+  index: -1
+bg
+  rotate: false
+  xy: 2, 651
+  size: 1561, 764
+  orig: 1561, 764
+  offset: 0, 0
+  index: -1
+bg-chuanglian1
+  rotate: false
+  xy: 1593, 441
+  size: 203, 309
+  orig: 203, 309
+  offset: 0, 0
+  index: -1
+bg-chuanglian2
+  rotate: true
+  xy: 688, 304
+  size: 345, 903
+  orig: 346, 903
+  offset: 1, 0
+  index: -1
+bg-denglong1
+  rotate: true
+  xy: 1831, 581
+  size: 67, 131
+  orig: 68, 131
+  offset: 0, 0
+  index: -1
+bg-denglong2
+  rotate: true
+  xy: 1456, 69
+  size: 60, 129
+  orig: 60, 129
+  offset: 0, 0
+  index: -1
+bg-fz1
+  rotate: true
+  xy: 688, 41
+  size: 185, 766
+  orig: 185, 766
+  offset: 0, 0
+  index: -1
+bg-fz2
+  rotate: false
+  xy: 1831, 650
+  size: 72, 765
+  orig: 72, 765
+  offset: 0, 0
+  index: -1
+bg-fz3
+  rotate: false
+  xy: 1905, 650
+  size: 67, 765
+  orig: 67, 765
+  offset: 0, 0
+  index: -1
+bg-fz4
+  rotate: true
+  xy: 688, 3
+  size: 36, 714
+  orig: 37, 714
+  offset: 1, 0
+  index: -1
+bg-fz5
+  rotate: false
+  xy: 688, 228
+  size: 971, 74
+  orig: 971, 74
+  offset: 0, 0
+  index: -1
+bg-fz6
+  rotate: true
+  xy: 1565, 752
+  size: 663, 264
+  orig: 663, 264
+  offset: 0, 0
+  index: -1
+bg-luoye1
+  rotate: true
+  xy: 1831, 520
+  size: 59, 89
+  orig: 59, 89
+  offset: 0, 0
+  index: -1
+bg-luoye2
+  rotate: false
+  xy: 1922, 520
+  size: 33, 59
+  orig: 33, 59
+  offset: 0, 0
+  index: -1
+bg-piaodai1
+  rotate: true
+  xy: 1798, 532
+  size: 218, 31
+  orig: 219, 31
+  offset: 1, 0
+  index: -1
+bg-pingfeng
+  rotate: true
+  xy: 2, 9
+  size: 640, 684
+  orig: 640, 684
+  offset: 0, 0
+  index: -1
+bg-shu1
+  rotate: true
+  xy: 1593, 361
+  size: 78, 159
+  orig: 78, 159
+  offset: 0, 0
+  index: -1
+bg-shu10
+  rotate: false
+  xy: 1704, 310
+  size: 20, 49
+  orig: 20, 49
+  offset: 0, 0
+  index: -1
+bg-shu11
+  rotate: true
+  xy: 1754, 358
+  size: 81, 59
+  orig: 81, 59
+  offset: 0, 0
+  index: -1
+bg-shu2
+  rotate: true
+  xy: 1593, 310
+  size: 49, 109
+  orig: 49, 109
+  offset: 0, 0
+  index: -1
+bg-shu3
+  rotate: true
+  xy: 1456, 131
+  size: 95, 254
+  orig: 95, 254
+  offset: 0, 0
+  index: -1
+bg-shu4
+  rotate: true
+  xy: 1404, 2
+  size: 37, 118
+  orig: 37, 118
+  offset: 0, 0
+  index: -1
+bg-shu5
+  rotate: true
+  xy: 1798, 462
+  size: 68, 29
+  orig: 68, 29
+  offset: 0, 0
+  index: -1
+bg-shu6
+  rotate: false
+  xy: 1686, 40
+  size: 33, 89
+  orig: 33, 89
+  offset: 0, 0
+  index: -1
+bg-shu7
+  rotate: true
+  xy: 1456, 45
+  size: 22, 51
+  orig: 22, 51
+  offset: 0, 0
+  index: -1
+bg-shu8
+  rotate: false
+  xy: 1524, 2
+  size: 68, 28
+  orig: 68, 28
+  offset: 0, 0
+  index: -1
+bg-shu9
+  rotate: false
+  xy: 1565, 688
+  size: 20, 62
+  orig: 20, 62
+  offset: 0, 0
+  index: -1
