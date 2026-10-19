@@ -689,12 +689,33 @@ Room {
       var skBase = Store.get(Cpp, g)
       var sk = host.resolveForm(skBase, host.selfHp())
       if (g !== host.myGeneral || sk !== host.mySkinKey) {
+        // ★ 先记住"变化之前"的值 —— 用来判断这是首次入场还是**形态切换** ✓
+        var prevGeneral = host.myGeneral
+        var prevSkin = host.mySkinKey
         host.myGeneral = g
         host.mySkinKey = sk
         host.myDef = Store.byKey(sk)
         console.warn("[fk-skel] 我在场上的武将 = " + g
           + "，我选的骨骼皮肤 = " + (host.mySkinKey || "（没选）"))
-        host.maybePlayEnter()    // 甲：进对局时我的角色带出场动画入场 ✓（每局一次 ✓）
+        // ══════════════════════════════════════════════════════════════
+        // ★★ 三种变化要**分开**处理 ✗✗
+        //   ① 首次解析出皮肤（`prevSkin` 还是空）→ 正常入场
+        //      （`enterPlayed` 守卫保证每局只一次 ✓）
+        //   ② **同一个武将、皮肤变了** = **形态切换** → **再播一次出场动画** ✓
+        //      （用户要求 ✓ 例：张琪瑛「九州春回」⇄「九州春回2」按体力自动切，
+        //        切换本身就是"变身"，播一下出场更有仪式感 ✓）
+        //   ③ 换了武将（`prevGeneral ≠ g`）→ **不重播**
+        //      （那是另一个角色，不该出现"变身"效果 ✓）
+        //   ⚠ 重播走 `maybePlayEnter(true)`，里面还有 2.5 秒防抖 ✓
+        //     （hp 在 ≤2 / >2 阈值附近波动会反复触发 → 不加防抖会变闪屏 ✗）
+        // ══════════════════════════════════════════════════════════════
+        var isFormSwitch = ("" + prevGeneral === "" + g)
+          && ("" + prevSkin !== "") && ("" + sk !== "")
+        if (isFormSwitch) {
+          console.warn("[fk-skel] ★ 形态切换：" + prevSkin + " → " + sk
+            + "（会再播一次出场动画 ✓）")
+        }
+        host.maybePlayEnter(isFormSwitch)
       }
       // ⚠ 每轮都重算取景值（不是只在换皮肤时算）：
       //   二期在换肤面板里点 +/- 之后，这边要**立刻**跟着变 ✓
@@ -814,10 +835,32 @@ Room {
   /// 出场动画：每局只播一次 ✓（甲方案：进对局时我的角色带特效入场 ✓）
   property bool enterPlayed: false
 
+  // ── 形态切换时**也播**出场动画（用户要求 ✓）需要的两个东西 ──
+  /// 上一次播出场动画的时间戳（毫秒）
+  property var lastEnterAt: 0
+  /// 防抖间隔（毫秒）：
+  ///   形态是按体力切换的，hp 在阈值（≤2 / >2）附近来回波动时会反复触发 ✓
+  ///   2.5 秒内不重复播 —— 既能看清变身，又不会变成闪屏 ✓
+  readonly property int enterDebounceMs: 2500
+
   /// 在"解析出我选的皮肤"之后调用 ✓ —— 稍等片刻让棋盘铺开再播 ✓
-  function maybePlayEnter() {
-    if (host.enterPlayed) return
+  ///
+  /// `force = true` ⇒ **已经播过也再播一次**（用于**形态切换** ✓）
+  ///   ⚠ 只该在"同一个武将、皮肤变了"时传 true（见 refresh 里的 `isFormSwitch`）
+  ///   ⚠ `force` 也受防抖限制（`enterDebounceMs`）；首次入场（force 不传）不受限 ✓
+  function maybePlayEnter(force) {
+    if (host.enterPlayed && !force) return
     if (!host.myDef || !host.myDef.field_enter_skel) return
+    // 防抖：只对"重播"生效（首次入场就该按时播，不该被拦 ✓）
+    if (force) {
+      var nowMs = Date.now()
+      var gap = nowMs - host.lastEnterAt
+      if (host.lastEnterAt > 0 && gap < host.enterDebounceMs) {
+        console.warn("[fk-skel] 形态切换 → 出场动画**防抖跳过**（距上次 "
+          + gap + "ms < " + host.enterDebounceMs + "ms）✓")
+        return
+      }
+    }
     // ★★ 出场骨架**就是头像骨架**时 → 跳过场上那条路 ✗✗✗
     //
     //   为什么（实测 ✓）：有这么一类皮肤 —— **只有 `XingXiang.skel`**，
@@ -840,8 +883,10 @@ Room {
       return
     }
     host.enterPlayed = true
+    host.lastEnterAt = Date.now()
     console.warn("[fk-skel] 出场动画：稍后播放 " + host.myDef.field_enter_skel
-      + "/" + (host.myDef.field_enter_anim || "play"))
+      + "/" + (host.myDef.field_enter_anim || "play")
+      + (force ? "（**形态切换重播** ✓）" : ""))
     enterTimer.start()
   }
 
