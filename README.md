@@ -22,7 +22,7 @@
 2. 主界面 → **包管理**（Package Manage）
 3. 底部输入框粘贴本仓库地址：
    ```
-   https://github.com/<你的用户名>/fk-skel
+   https://github.com/yangyou051/fk-skel
    ```
 4. 点 **Install From URL**
 5. 重启游戏
