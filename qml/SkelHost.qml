@@ -135,10 +135,36 @@ Room {
     if (!cond) return false
     var c = "" + cond
     if (c === "default") return true
-    var m = c.match(/^skill_(\w+)$/)
+    // ⚠ 用 `(.+)` 而不是 `(\w+)`：核心的技能名可能带 `#`
+    //   （实测 `#poyuan_2_trig`）—— `\w` 不含 `#`，写全名会解析不出来 ✗
+    var m = c.match(/^skill_(.+)$/)
     if (m) {
+      var want = m[1]
       var arr = skillHits || []
-      return arr.indexOf(m[1]) >= 0
+      // ⚠⚠ 核心传过来的技能名**不是纯技能名** ✗✗
+      //   实测日志：`我发动技能「#poyuan_2_trig」`
+      //   —— 破垣有多个触发点（`poyuan.lua` 里 fk.GameStart / fk.TurnStart），
+      //     核心给每个触发点起了 `#<技能名>_<序号>_trig` 这样的名字 ✓
+      //
+      //   ⇒ 只写 `skill_poyuan` 必须能命中 `#poyuan_2_trig` ✓
+      //     但又**不能**让 `poyuan` 命中 `poyuan2_...`（那会误切）✗
+      //   ⇒ 分两步：① 先精确匹配（想写全名也行 ✓）
+      //             ② 再"包含 + **词边界**"匹配（`#`/`_` 边上才算 ✓）
+      for (var i = 0; i < arr.length; i++) {
+        if (("" + arr[i]) === want) return true
+      }
+      for (var j = 0; j < arr.length; j++) {
+        var s = "" + arr[j]
+        var idx = s.indexOf(want)
+        while (idx >= 0) {
+          var before = (idx > 0) ? s.charAt(idx - 1) : ""
+          var after = (idx + want.length < s.length) ? s.charAt(idx + want.length) : ""
+          // 前后都不是字母/数字 ⇒ 这里是一个独立的词 ✓
+          if (!/[A-Za-z0-9]/.test(before) && !/[A-Za-z0-9]/.test(after)) return true
+          idx = s.indexOf(want, idx + 1)
+        }
+      }
+      return false
     }
     m = c.match(/^hp_(le|lt|ge|gt|eq)_(-?\d+)$/)
     if (!m) return false
