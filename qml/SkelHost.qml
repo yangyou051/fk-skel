@@ -101,11 +101,48 @@ Room {
     return null
   }
 
-  /// 解析形如 `hp_le_2` 的条件 ✓（支持 le/lt/ge/gt/eq）
-  function formMatches(cond, hp) {
-    if (hp === null || hp === undefined || !cond) return false
-    var m = ("" + cond).match(/^hp_(le|lt|ge|gt|eq)_(-?\d+)$/)
+  /// 我当前的**阶段**（核心 `Player.NotActive = 8` = 回合外 ✓）
+  ///   依据：`ltk/core/player.lua:56`
+  ///     Player.NotActive = 8   -- 不活跃阶段(回合外)
+  ///     Player.PhaseNone = 9   -- 无阶段(阶段之间的间隙)   ← 注意别把它当回合外 ✗
+  ///   ⇒ **`phase === 8` 才算我的回合结束了** ✓
+  function selfPhase() {
+    try {
+      var p = Probe.myPhoto(host)
+      if (p && p.dataModel && typeof p.dataModel.phase === "number") return p.dataModel.phase
+    } catch (e) {}
+    return null
+  }
+
+  /// 本回合**触发过的技能名**（事件驱动形态用 ✓）
+  ///   例：刘晔破垣 `poyuan` 发动 → `form_when = "skill_poyuan"` 那套生效 ✓
+  ///
+  ///   ⚠⚠ 必须是**列表**，不能只存"最后一个技能名" ✗✗
+  ///     踩过的坑：只存最后一个的话 —— 先发动破垣（切形态2 ✓），
+  ///     之后又发动别的技能（如 `huace`）把它覆盖掉 → 形态**又切回1** ✗
+  ///   ⇒ 本回合触发过的技能都记着，条件匹配**任意一个**就算成立 ✓
+  ///
+  ///   清空时机：**我的回合结束**（`phase === 8` = `Player.NotActive` ✓）
+  ///   对应注册表 `special.condition.*.recover: true`（回合结束恢复）
+  ///   依据：核心 `room.lua:632` `doAnimate("InvokeSkill", { name = skill_name, … })`
+  property var formSkillHits: []
+
+  /// 解析形如 `hp_le_2` / `skill_poyuan` / `default` 的形态条件 ✓
+  ///   * `hp_*`    体力条件（张琪瑛那套用的）
+  ///   * `skill_X` 事件条件：X 是技能名（刘晔破垣那套用的）
+  ///   * `default` 兜底 —— **永远匹配，但优先级最低**（见 resolveForm ✓）
+  function formMatches(cond, hp, skillHits) {
+    if (!cond) return false
+    var c = "" + cond
+    if (c === "default") return true
+    var m = c.match(/^skill_(\w+)$/)
+    if (m) {
+      var arr = skillHits || []
+      return arr.indexOf(m[1]) >= 0
+    }
+    m = c.match(/^hp_(le|lt|ge|gt|eq)_(-?\d+)$/)
     if (!m) return false
+    if (hp === null || hp === undefined) return false
     var n = parseInt(m[2], 10)
     var op = m[1]
     if (op === "le") return hp <= n
@@ -115,25 +152,41 @@ Room {
     return hp === n
   }
 
-  /// 由"基础形态"和当前体力决议出**生效形态**的 key ✓
+  /// 由"基础形态"和当前状态决议出**生效形态**的 key ✓
   ///   * 基础形态没写 `form_group` → 原样返回（**现有皮肤的路径完全不变** ✓）
-  ///   * 同组里没有匹配的 / 体力读不到 → 也返回基础形态（安全退化 ✓）
-  function resolveForm(baseKey, hp) {
+  ///   * 同组里没有匹配的 → 也返回基础形态（安全退化 ✓）
+  ///
+  /// ★ 优先级：**非 default 条件先匹配**，`default` 只作兜底 ✗✗
+  ///   为什么：`default` 永远成立，如果按数组顺序先碰到它，
+  ///   后面 `skill_poyuan` 就永远轮不到 → 形态永远切不过去 ✗
+  function resolveForm(baseKey, hp, skillHits) {
     if (!baseKey) return baseKey
     var baseDef = Store.byKey(baseKey)
     if (!baseDef || !baseDef.form_group) return baseKey
-    if (hp === null || hp === undefined) return baseKey
     var all = Store.skins()
+    var fallback = null
     for (var i = 0; i < all.length; i++) {
       var d = all[i]
       if (("" + d.form_group) !== ("" + baseDef.form_group)) continue
-      if (host.formMatches(d.form_when, hp)) {
+      if (("" + d.form_when) === "default") {
+        if (!fallback) fallback = d
+        continue                      // ← 兜底先记着，不立刻返回 ✓
+      }
+      if (host.formMatches(d.form_when, hp, skillHits)) {
         if (("" + d.key) !== ("" + baseKey)) {
           console.warn("[fk-skel] 形态切换：" + baseKey + " → " + d.key
-            + "（体力 " + hp + " 满足 " + d.form_when + "）✓")
+            + "（满足 " + d.form_when + "，体力=" + hp
+            + " 本回合技能=" + JSON.stringify(skillHits || []) + "）✓")
         }
         return d.key
       }
+    }
+    if (fallback) {
+      if (("" + fallback.key) !== ("" + baseKey)) {
+        console.warn("[fk-skel] 形态恢复：" + baseKey + " → " + fallback.key
+          + "（没有条件成立 → 用 default ✓）")
+      }
+      return fallback.key
     }
     return baseKey
   }
@@ -686,8 +739,18 @@ Room {
       //   `skBase` = 存档里玩家选的（**基础形态**，永远不改 ✓）
       //   `sk`     = 按体力决议出的**生效形态**（对局中可能不同 ✓）
       //   没写 `form_group` 的皮肤：`resolveForm` 原样返回 ⇒ **行为完全不变** ✓
+      // ★ 回合结束 → 清掉本回合的「技能形态」标记 ✓
+      //   依据：核心 `player.lua:56` `Player.NotActive = 8`（回合外）
+      //   对应注册表 `special.condition.*.recover: true`（刘晔破垣那套的"回合结束恢复"）
+      //   ⚠ 别用 `PhaseNone = 9` —— 那是阶段之间的间隙，回合内也会出现 ✗
+      var ph = host.selfPhase()
+      if (ph === 8 && host.formSkillHits.length > 0) {
+        console.warn("[fk-skel] 我的回合结束（phase=8=NotActive）→ 清除本回合技能形态标记 "
+          + JSON.stringify(host.formSkillHits) + "，恢复默认形态 ✓")
+        host.formSkillHits = []
+      }
       var skBase = Store.get(Cpp, g)
-      var sk = host.resolveForm(skBase, host.selfHp())
+      var sk = host.resolveForm(skBase, host.selfHp(), host.formSkillHits)
       if (g !== host.myGeneral || sk !== host.mySkinKey) {
         // ★ 先记住"变化之前"的值 —— 用来判断这是首次入场还是**形态切换** ✓
         var prevGeneral = host.myGeneral
@@ -1089,6 +1152,21 @@ Room {
     try {
       if (command === "Animate") {
         if (data.player !== me) return
+        // ★ 记下技能名 —— 供**事件驱动的形态切换**用 ✓
+        //   依据：核心 `room.lua:632`
+        //     self:doAnimate("InvokeSkill", { name = skill_name, player = player.id, … })
+        //   ⇒ `data.name` 就是技能名（如刘晔的 `poyuan` 破垣）
+        //   ⚠ 存**列表**不存单个值 ✗ —— 先破垣再发动别的技能时，
+        //     单个值会被覆盖 → 形态又切回去 ✗（见 formSkillHits 的注释）
+        //   这里只记录，判断留给 `resolveForm` 的 `form_when = "skill_xxx"` ✓
+        if (data.name) {
+          var sn = "" + data.name
+          if (host.formSkillHits.indexOf(sn) < 0) {
+            host.formSkillHits.push(sn)
+            console.warn("[fk-skel] 我发动技能「" + sn
+              + "」→ 记入本回合技能列表 " + JSON.stringify(host.formSkillHits) + " ✓")
+          }
+        }
         if (data.type === "InvokeSkill") {
           host.playField("field_anim")
         } else if (data.type === "InvokeUltSkill") {
