@@ -788,7 +788,8 @@ Room {
     z: 950
     onClosed: host.refresh()
     // 三期：面板里的「试播大动画」按钮 → 转给宿主播
-    onFieldRequested: host.playField()
+    // ★ 带参：面板会告诉我们播「技能」还是「攻击」✓（playField 里按用途取骨架/微调）
+    onFieldRequested: function (fieldKey) { host.playField(fieldKey || "field_anim") }
     // 试播出场 ✓ —— 会读 `#enter` 那份微调 ✓，所以看到的=下一局入场的效果 ✓
     onEnterRequested: host.playField("field_enter")
   }
@@ -910,15 +911,47 @@ Room {
     }
     var base = Cpp.path + "/packages/fk-skel/skins/" + d.key + "/"
       + (d.dir || "image/skins") + "/"
-    // 场上动画微调（存在我们自己那张表的另一个键下：皮肤key + "#field" ✓）
+    // ══════════════════════════════════════════════════════════════════
+    // ★ 场上动画：**按用途分开**取「微调键」和「基准高度」✓
+    //
+    //   为什么（徐馨、慵仪闲趣实测暴露问题 ✓）：
+    //     一套皮肤的**技能和攻击可能用不同骨架**：
+    //       技能 daiji2   (601×335)
+    //       攻击 chuchang (1059×592)   ← 画面大近 3 倍
+    //     而 `SkelField.qml:226` 是 `skel.scale = 页高 × heightRatio / 骨架高`
+    //     ⇒ heightRatio 控制的是**整个画面在屏幕上的高度**，
+    //       同一个值下两个骨架"画面高相同"，但**人物占比不同** ⇒ 看起来一大一小 ✗
+    //     注册表里本来就是三个不同大小（teshu 1.29 / gongji 0.87 / chuchang 0.46），
+    //     换算成"画面高"要乘骨架高：432 : 515 : 272
+    //     ⇒ 所以基准高度必须能**按用途**给（`field_height_card` / `field_height_enter`）✓
+    //
+    //   ① 微调键：
+    //        技能 → `<皮肤>#field:teshu`
+    //        攻击 → `<皮肤>#field:gongji`
+    //        出场 → `<皮肤>#enter`      （本来就有 ✓）
+    //      ⚠ 老的 `#field` 仍然兼容：先读新键，没有再读老键（已存的微调不丢 ✓）
+    //   ② 基准高度：专用字段优先，没有就回退通用 `field_height`
+    //      （11 套老皮肤都没写新字段 ⇒ 行为完全不变 ✓）
+    // ══════════════════════════════════════════════════════════════════
+    var tuneKey = (key === "field_enter") ? "#enter"
+      : (key === "field_card_anim" ? "#field:gongji" : "#field:teshu")
     var ft = null
-    // 出场动画用自己那份微调 ✓（键 `<皮肤>#enter` ✓）；技能/伤害牌仍是 `#field` ✓
-    var tuneKey = (key === "field_enter") ? "#enter" : "#field"
-    try { ft = Store.tuneGet(Cpp, d.key + tuneKey) } catch (e) { ft = null }
+    try {
+      ft = Store.tuneGet(Cpp, d.key + tuneKey)
+      // 兼容老键（技能/攻击曾经共用一份 ✓）
+      if (!ft && tuneKey !== "#enter") ft = Store.tuneGet(Cpp, d.key + "#field")
+    } catch (e) { ft = null }
     var fmul = (ft && ft.mul !== null && ft.mul !== undefined) ? ft.mul : 1
     var fdx = (ft && ft.dx !== null && ft.dx !== undefined) ? ft.dx : 0
     var fdy = (ft && ft.dy !== null && ft.dy !== undefined) ? ft.dy : 0
-    var baseH = (d.field_height !== undefined) ? (1 * d.field_height) : 0.5
+    // 基准高度：按用途取专用值 ✓（没写就回退 `field_height` ✓）
+    var bh = d.field_height
+    if (key === "field_card_anim" && d.field_height_card !== undefined) {
+      bh = d.field_height_card
+    } else if (key === "field_enter" && d.field_height_enter !== undefined) {
+      bh = d.field_height_enter
+    }
+    var baseH = (bh !== undefined) ? (1 * bh) : 0.5
     var baseDy = (d.field_dy !== undefined) ? (1 * d.field_dy) : 0
     var obj = comp.createObject(host, {
       atlasFile: base + skelName + ".atlas",

@@ -38,6 +38,24 @@ return {
   field_skel_card = "chuchang",
   field_card_anim = "play",
   field_height = 1.5,
+  -- ★★ 攻击 / 出场**单独的高度**（注册表给的三个 scale 本来就不一样 ✓）
+  --
+  --   注册表（lib/dynamicSkin.js:45719-45740）：
+  --     teshu   (技能) scale 1.29  × 骨架高 335 = 432
+  --     gongji  (攻击) scale 0.87  × 骨架高 592 = 515
+  --     chuchang(出场) scale 0.46  × 骨架高 592 = 272
+  --
+  --   为什么必须乘骨架高：`SkelField.qml:226` 是
+  --     `skel.scale = 页高 × heightRatio / 骨架高`
+  --   也就是 heightRatio 控制的是**整个画面在屏幕上的高度**。
+  --   同一 heightRatio 下，601x335 和 1059x592 两个骨架画面高相同，
+  --   但**人物占比不同** ⇒ 看起来一大一小 ✗
+  --
+  --   以技能 1.5 为基准换算：
+  --     攻击 = 1.5 × (515/432) = 1.788
+  --     出场 = 1.5 × (272/432) = 0.944
+  field_height_card = 1.788,
+  field_height_enter = 0.944,
   field_anchor = "center",
   field_dy = -0.1,
   damage_cards = "slash,fire__slash,thunder__slash,duel,fire_attack,savage_assault,archery_attack,drowning",

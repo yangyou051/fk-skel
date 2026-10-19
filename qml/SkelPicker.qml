@@ -23,7 +23,9 @@ W.PageBase {
   signal closed()
   /// 三期：请求宿主试播一次场上大动画
   ///   （做成信号而不是直接调用：这个面板在大厅「更多」里也会用，那时没有宿主 ✓）
-  signal fieldRequested()
+  /// ★ 带参数 `fieldKey`：'field_anim'（技能）| 'field_card_anim'（攻击）✓
+  ///   这样面板上「试播技能 / 试播攻击」能精确指定播哪一个 ✓
+  signal fieldRequested(string fieldKey)
   /// 出场动画的试播 ✓（和"试播大动画"同一套机制 ✓，只是换骨架和微调那份 ✓）
   signal enterRequested()
 
@@ -211,7 +213,35 @@ W.PageBase {
   //   清单里的 `field_dy`（默认 -0.1 = 上移 10%）是基准，显示的是**合计值** ✓
   // -------------------------------------------------------------------------
 
-  /// 后缀：技能/伤害牌用 "#field" ✓，出场用 "#enter" ✓（同一张表 ✓ 不用改结构 ✓）
+  /// 后缀：技能用 "#field:teshu" / 攻击用 "#field:gongji" / 出场用 "#enter" ✓
+  /// （同一张表 `fk_skel_tune` ✓ 不用改库结构 ✓）
+  ///
+  /// ★ 为什么技能/攻击要**分开**（用户实测暴露 ✓）：
+  ///   一套皮肤的场上动画可能用**不同骨架**（徐馨、慵仪闲趣：技能 daiji2、攻击 chuchang），
+  ///   两者骨架画面尺寸差近 3 倍 ⇒ 用同一个微调键（老的 "#field"）**必然调不准两个** ✗
+  ///   ⇒ 拆成两个键，各自独立调 ✓
+  ///   ⚠ 老的 "#field" 仍兼容（`SkelHost.playField` 读不到新键会回退 ✓）
+  ///
+  /// `fieldTarget` = 当前调整/试播的对象：'teshu'（技能）| 'gongji'（攻击）
+  ///   点「场上动画·技能/攻击」那个标题就能切换 ✓ **不新增按钮**（不挤压预览框 ✓）
+  property string fieldTarget: "teshu"
+
+  function cycleFieldTarget() {
+    root.fieldTarget = (root.fieldTarget === "gongji") ? "teshu" : "gongji"
+    root.status = "场上动画调整对象 → "
+      + (root.fieldTarget === "gongji" ? "攻击" : "技能")
+      + "（下面的 ± 现在只改它 ✓）"
+  }
+
+  /// 当前目标的显示名
+  function fieldTargetName() {
+    return (root.fieldTarget === "gongji") ? "攻击" : "技能"
+  }
+
+  /// 当前目标对应的 playField 用途键 ✓
+  function fieldKeyOfTarget() {
+    return (root.fieldTarget === "gongji") ? "field_card_anim" : "field_anim"
+  }
 
   // ══════════════════════════════════════════════════════════════════
   // ★★ 预览专用微调（`<皮肤>#preview`）★★
@@ -274,7 +304,10 @@ W.PageBase {
   }
 
   function fieldKeyOf(sfx) {
-    return root.selectedKey ? (root.selectedKey + (sfx || "#field")) : ""
+    // 没显式给 sfx 时 → 用**当前调整目标**（技能/攻击分开 ✓）
+    var s = sfx
+    if (!s) s = (root.fieldTarget === "gongji") ? "#field:gongji" : "#field:teshu"
+    return root.selectedKey ? (root.selectedKey + s) : ""
   }
 
   function effFieldFace(sfx) {
@@ -309,7 +342,8 @@ W.PageBase {
     root.bumpTune()
     root.status = (sfx === "#enter")
       ? "出场动画微调已改 —— 下一局入场时生效"
-      : "场上动画微调已改 —— 点「试播大动画」立刻看效果"
+      : ("「" + root.fieldTargetName() + "」动画微调已改 —— 点「试播"
+         + root.fieldTargetName() + "」立刻看效果")
   }
 
   function fieldReset(sfx) {
@@ -774,11 +808,21 @@ W.PageBase {
       Layout.fillWidth: true
       spacing: 8
 
+      // ★ 标题本身**可点** → 切换「技能 / 攻击」的调整对象 ✓
+      //   为什么不用新按钮（用户诉求 ✓）：底部那排按钮已经挺满，
+      //   再加一个会把预览框挤小 ✗ —— 点标题**零空间成本** ✓
       Text {
-        text: "场上动画"
+        text: "场上动画·" + root.fieldTargetName()
         color: "#E4D5A0"
         font.pixelSize: 14
         Layout.minimumWidth: 0
+        // 加个下划线暗示"可点"（QML Text 的 font.underline 就够 ✓）
+        font.underline: true
+        MouseArea {
+          anchors.fill: parent
+          cursorShape: Qt.PointingHandCursor
+          onClicked: root.cycleFieldTarget()
+        }
       }
       W.ButtonContent {
         text: "−"
@@ -1053,6 +1097,9 @@ W.PageBase {
       // 三期：试播场上大动画。
       // 做成**按钮**而不是只靠热键 —— 热键会被核心占用（实测 Ctrl+F 是核心的
       // "全屏切换"，我的热键被它吃掉，日志里一行都没有 ✗）。按钮不会冲突 ✓
+      //
+      // ★ 试播对象跟着「场上动画·技能/攻击」的表头走 ✓（见上面点标题切换）
+      //   这样「调整」和「试播」永远是同一个对象，不会出现"调了技能却在放攻击"✗
       W.ButtonContent {
         text: "试播出场"
         Layout.preferredWidth: 120
@@ -1062,12 +1109,12 @@ W.PageBase {
         onClicked: root.enterRequested()
       }
       W.ButtonContent {
-        text: "试播大动画"
+        text: "试播" + root.fieldTargetName()
         Layout.preferredWidth: 140
         Layout.maximumWidth: 140
         Layout.minimumWidth: 140
         enabled: root.selectedKey !== ""
-        onClicked: root.fieldRequested()
+        onClicked: root.fieldRequested(root.fieldKeyOfTarget())
       }
       W.ButtonContent {
         text: "换上"
